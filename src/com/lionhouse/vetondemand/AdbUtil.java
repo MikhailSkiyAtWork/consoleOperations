@@ -5,10 +5,11 @@ package com.lionhouse.vetondemand;
  */
 
 import java.io.*;
-import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Helps to work with adb via terminal
@@ -53,10 +54,15 @@ public class AdbUtil {
                 .concat(" ")
                 .concat(toFolderPath);
 
+        System.out.println("Created pull cmd: " + pullCommand);
+
         Process process = Runtime.getRuntime().exec(pullCommand);
-        process.waitFor();
+        //process.waitFor();
     }
 
+    /**
+     * Returns xmlTree of AndroidManigest.xlm
+     */
     public static String getXmlTree(String apkName) throws IOException, InterruptedException{
         String getXmlTreeCommand = aaptFullPath_.concat(" ")
                 .concat(Constants.DUMP_XMLTREE)
@@ -65,28 +71,128 @@ public class AdbUtil {
                 .concat(" ")
                 .concat(Constants.MANIFEST);
 
+        System.out.println("Created XML tree cmd: " + getXmlTreeCommand);
+
         String fullXmlTree = executeTerminalCommand(getXmlTreeCommand);
         return fullXmlTree;
     }
 
+    /**
+     * Creates full path of pulled apk
+     */
     private static String createPulledApkLocation(String apkName){
         String pulledApkLocation = Constants.PULLED_APK_PATH.concat("/").concat(apkName);
         return pulledApkLocation;
     }
 
+    /**
+     * Returns list of all activities from AndroidManifest.xml
+     */
     public static List<String> getAllActivities(String xmlTree){
         List<String> activities = new ArrayList<>();
         Scanner scanner = new Scanner(xmlTree);
         while (scanner.hasNextLine()){
             String line = scanner.nextLine();
             if (line.contains("Activity")){
-                String activityName = line;
-                activities.add(activityName);
+                if (line.contains(Constants.TARGET_PACKAGE)) {
+                    String activityName = getActivityNameWithoutPackage(getFullActivityName(line));
+                    activities.add(activityName);
+                }
             }
         }
 
         return activities;
+    }
 
+    /**
+     * Call activity
+     * @param activityName - activity name without package (like .activities.MainActivity)
+     */
+    public static void startActivity(String activityName) throws IOException, InterruptedException{
+        executeTerminalCommand(createStartActivityCommand(activityName));
+
+    }
+
+    private static String createStartActivityCommand(String activityName){
+        String fullActivityName = Constants.TARGET_PACKAGE.concat("/")
+                .concat(activityName);
+
+        String startActivityCommand = adbFullPath_.concat(" ").concat(Constants.START_ACTIVITY_CMD).concat(" ")
+                .concat(fullActivityName);
+
+        System.out.println("START" + startActivityCommand);
+
+        return startActivityCommand;
+    }
+
+
+    public static void makeScreenshot(String activityName) throws IOException, InterruptedException{
+        String makeScreenshot = createScreenshotCommand(activityName);
+        executeVoidOperation(makeScreenshot);
+
+        String pullScrenshot = createPullScreenshotCommand(activityName);
+        executeVoidOperation(pullScrenshot);
+
+    }
+
+    private static void executeVoidOperation(String cmd) throws IOException, InterruptedException {
+        Process process = Runtime.getRuntime().exec(cmd);
+        process.waitFor();
+    }
+
+    /**
+     * Makes full command to create screenshot on the device
+     */
+    private static String createScreenshotCommand(String activityName){
+        String screenshotCommand = adbFullPath_.concat(" ")
+                .concat(Constants.MAKE_SCREENSHOT_CMD)
+                .concat(activityName)
+                .concat(".png");
+
+        System.out.println(screenshotCommand);
+
+        return screenshotCommand;
+    }
+
+    /**
+     * Makes full command to pull screenshot to the PC
+     */
+    private static String createPullScreenshotCommand(String activityName){
+        String pullScreenshotCommand = adbFullPath_.concat(" ")
+                .concat(Constants.PULL_SCREENSHOT_CMD)
+                .concat(activityName)
+                .concat(".png")
+                .concat(" ")
+                .concat(Constants.PULLED_SCREENS_PATH)
+                .concat("/")
+                .concat(activityName.replace(".activities.",""))
+                .concat(".png");
+
+        System.out.println(pullScreenshotCommand);
+
+        return pullScreenshotCommand;
+    }
+
+
+    /**
+     * Returns full name of each activity
+     */
+    private static String getFullActivityName(String line){
+        Pattern pattern = Pattern.compile("\"(.*?)\"");
+        Matcher matcher = pattern.matcher(line);
+        if (matcher.find()){
+            return  matcher.group(0).replace("\"","");
+        }
+        return "";
+    }
+
+    /**
+     * Returns activity name without package (like .activities.MainActivity)
+     */
+    private static String getActivityNameWithoutPackage(String fullActivityName){
+        int packageLength = Constants.TARGET_PACKAGE.length();
+        String clearName = fullActivityName.substring(packageLength);
+        return clearName;
     }
 
     // TODO ADD ERROR HANDLING
@@ -96,7 +202,7 @@ public class AdbUtil {
 
         Reader in = new InputStreamReader(process.getInputStream());
         in = new BufferedReader(in);
-        char[] buffer = new char[5024];
+        char[] buffer = new char[20000];
         int len = in.read(buffer);
         String s = new String(buffer, 0, len);
         return s;
@@ -130,7 +236,5 @@ public class AdbUtil {
         }
         return targetPackage;
     }
-
-
 
 }

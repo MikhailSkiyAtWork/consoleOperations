@@ -60,7 +60,8 @@ public class Main {
         AdbUtil.saveApkInFolder(apkLocation,Constants.PULLED_APK_PATH);
         String xmlTree = AdbUtil.getXmlTree(apkName);
 
-       List<String> acs = AdbUtil.getAllActivities(xmlTree);
+        // Get list of all activities
+        List<String> acs = AdbUtil.getAllActivities(xmlTree);
 
 
 
@@ -71,8 +72,19 @@ public class Main {
 
 
         System.out.println("Found activities");
-        for (int i =0; i<acs.size();i++){
+//        for (int i =0; i<acs.size();i++){
+        try {
+                          //1000 milliseconds is one second.
+
+        for (int i =0; i<5;i++){
             System.out.println(acs.get(i));
+            AdbUtil.startActivity(acs.get(i));
+            AdbUtil.makeScreenshot(acs.get(i));
+            Thread.sleep(10000);
+        }
+
+        } catch(InterruptedException ex) {
+            Thread.currentThread().interrupt();
         }
     }
 }
